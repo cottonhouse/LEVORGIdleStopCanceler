@@ -1,9 +1,9 @@
 # LEVORGIdleStopCanceler
-　Idling Stop Setting Value Reserver
+　Idling Stop Setting Value Reserver (Idle Stop Canceler)  
 　for SUBARU LEVORG NV5(2020-)
 
 # Name
-　SUBARU LEVORG NV5 Idling Stop Setting Value Reserver  
+　SUBARU LEVORG NV5 Idling Stop Setting Value Reserver (Idle Stop Canceler)  
 
 　LEVORGのアイドリングストップ設定を保存し、次回のエンジン起動時に復元する実験をしました。  
  
@@ -22,6 +22,7 @@
  　Arduino Leonard (Arduino ProMicro, CJMCU Beetle) 用にプログラミングしています。  
  　また、動作確認もLeonard互換のArduinoを用いています。  
 -MCP2515 CANコントローラ＋CANレシーバ（「NiRen MCP2515_CANモジュール」の水晶発振器が16Mhzのものを利用しました。）  
+
 ソフトウェア  
 -Arduino IDE  
 -[coryjfouler/MCP_CAN_lib ライブラリ(GitHub)](https://github.com/coryjfowler/MCP_CAN_lib)  
@@ -36,11 +37,14 @@
 　今回使用したCANモジュールは、過去には16MHzの発信機が搭載されていましたが、2023年の現状、8MHzが搭載されているものが大半のようですので、8MHzのモジュールを利用する場合はプログラムの MCP_16MHZ の部分を MCP_8MHZ に書き換えてください。  
 　発振周波数はCANモジュール上に搭載されている水晶発振器の表面に記載されていますので、ご確認ください。  
 
+ソフトウェア
+　Arduino IDEを使って書き込んでください。  
+
 # Usage
 　電源は車体のアクセサリ電源から取得してください。  
 　（プログラムコード上は他の電源でも動作すると思いますが、アクセサリ電源でしか動作を確認していません。）  
  
-　車体のCANの線はドライバーズモニタリングシステムのコネクタ辺りから取るのが良いようです。  
+　車体のCANの線はドライバーズモニタリングシステムのコネクタから取るのが良いようです。  
 　セキュリティ面を考えてのことだと思いますが、OBDのコネクタにはCANのデータは出ていないそうです。  
 　また、車両に結線する際はCANレシーバの終端抵抗120Ωは不要です。（車体のCAN幹線に設置されているため。）  
 　NiRen MCP2515_CANモジュールですと、ジャンパJ1をオープンにした状態が終端抵抗が接続されていない状態です。  
