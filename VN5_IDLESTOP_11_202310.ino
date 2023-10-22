@@ -14,6 +14,7 @@
 // Rev.08 Serial.printをDEBUGモード時に有効にする
 // Rev.09 CANのライブラリをCAN_BUS_Shieldからcoryjfouler/mcp_canに変更
 // Rev.10 注釈にした不要な行の削除
+// Rev.11 万が一の危険性を考慮（CAN分析では出なかった値がパケットに出た場合を考えた処理を追加）
 #include <Arduino.h>
 #include <Ticker.h>
 #include <mcp_can.h>
@@ -61,6 +62,31 @@ void getRomstat() {
   #endif
 }
 
+// パケット送信
+void PktSend() {
+  unsigned char chksum = 0; // チェックサム計算用
+  unsigned char sendbuf[8]; // 送信用バッファ
+  static unsigned char SecNo = 0; // シーケンシャルNo用
+
+  sendbuf[1] = SecNo; // シーケンシャルNo
+  sendbuf[2] = buf[2];
+  sendbuf[3] = buf[3];
+  sendbuf[4] = buf[4];
+  sendbuf[5] = buf[5];
+  sendbuf[6] = 0xC0 | (buf[6] & 0x0F); // SW ON
+  sendbuf[7] = buf[7];
+  for(int i = 1; i < len; i++) { // buf[1] から buf[7] を合計してチェックサムを計算
+    chksum += sendbuf[i];
+  }
+  sendbuf[0] = chksum + 0x93;
+  CAN.sendMsgBuf(0x390, 0, len, sendbuf);  // 送信！
+
+  SecNo = (++SecNo) & 0x0F;  // シーケンシャルNoの加算(不要と思われるが、念の為変える)
+  #ifdef DEBUG
+  Serial.println("Send"); 
+  #endif
+}
+
 void setup() {
   #ifdef DEBUG
   Serial.begin(115200);
@@ -102,33 +128,9 @@ void setup() {
   blinker.start();
 }
 
-// パケット送信
-void PktSend() {
-  unsigned char chksum = 0; // チェックサム計算用
-  unsigned char sendbuf[8]; // 送信用バッファ
-  static unsigned char SecNo = 0; // シーケンシャルNo用
-
-  sendbuf[1] = SecNo; // シーケンシャルNo
-  sendbuf[2] = buf[2];
-  sendbuf[3] = buf[3];
-  sendbuf[4] = buf[4];
-  sendbuf[5] = buf[5];
-  sendbuf[6] = 0xC0 | (buf[6] & 0x0F); // SW ON
-  sendbuf[7] = buf[7];
-  for(int i = 1; i < len; i++) { // buf[1] から buf[7] を合計してチェックサムを計算
-    chksum += sendbuf[i];
-  }
-  sendbuf[0] = chksum + 0x93;
-  CAN.sendMsgBuf(0x390, 0, len, sendbuf);  // 送信！
-
-  SecNo = (++SecNo) & 0x0F;  // シーケンシャルNoの加算(不要と思われるが、念の為変える)
-  #ifdef DEBUG
-  Serial.println("Send"); 
-  #endif
-}
-
 void loop() {
   static unsigned char D4_174;  // D4の直前の値保存用
+  static unsigned int refTimes = 0; // 設定反映の試行回数
   blinker.update();
 
   if(CAN_MSGAVAIL == CAN.checkReceive()) {
@@ -149,6 +151,7 @@ void loop() {
         } else { // エンジンがONになった
           if(STAT == 0) { // エンジンがONでステータスが0だったらステータス1に変遷
             STAT = 1; // EEPROMに保存された値の復旧処理ステータスへ変遷
+            refTimes = 0; // 送信試行回数クリア
             #ifdef DEBUG
             Serial.println("Mode:1");
             #endif
@@ -164,7 +167,19 @@ void loop() {
                 Serial.print("  ROM: "); Serial.println(romstat, HEX);
                 Serial.print("  D4 : ");  Serial.println(buf[4], HEX);
                 #endif
-              } // 設定が同じになるまで繰り返し送る
+              } else {
+                // 念の為のルーチン（送信して設定が変更されても保存された前回値にならなかった場合（CAN解析では出てこなかった値になった場合）
+                // 無限に送信してしまう事になるのでそれを防止）
+                if(refTimes > 4) { // 送信試行は5回まで
+                  STAT = 2;
+                  pktSending = 0;  // 送信中フラグOFF
+                  D4_174 = romstat; // EEPROM保存データを格納しておくと、STAT2で現在設定がEEPROMに保存される
+                  refTimes = 0; // 要らないけど気持ち悪いのでクリアしておく
+                  #ifdef DEBUG
+                  Serial.println("Mode:2"); 
+                  #endif
+                }
+              }
             } else {
               STAT = 2; // 保存された設定と同じだった or Sendの結果同じになったら、次のステータスへ（2=設定値の保存ステータス）
               pktSending = 0;  // 送信中フラグOFF
@@ -193,6 +208,7 @@ void loop() {
         if(pktSending) { // パケット送信中フラグがONの時
           if((buf[6] & 0xF0) != 0xC0) { // 自分が送ったデータ含む SW ONのデータを受信した時は、パケットは送らない
             PktSend(); // パケット送信
+            refTimes++; // 送信回数カウント
           }
         }
         break;
