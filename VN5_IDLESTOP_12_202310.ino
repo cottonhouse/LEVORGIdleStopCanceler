@@ -15,6 +15,7 @@
 // Rev.09 CANのライブラリをCAN_BUS_Shieldからcoryjfouler/mcp_canに変更
 // Rev.10 注釈にした不要な行の削除
 // Rev.11 万が一の危険性を考慮（CAN分析では出なかった値がパケットに出た場合を考えた処理を追加）
+// Rev.12 パケットの条件比較をビットで比較に変更（実利用を考慮）
 #include <Arduino.h>
 #include <Ticker.h>
 #include <mcp_can.h>
@@ -51,11 +52,11 @@ void getRomstat() {
   Serial.print("EEPROM Read: ");
   Serial.print(romstat, HEX);  
   #endif
-  // 値は00(ON)かC0(OFF)しか保存されないはずだが、念の為それ以外だったら0にする（保存途中に電源が切れたりして内容が破壊されることもあり得る)）
-  romstat &= 0xF0; // 上位4bit取り出し
-  if(romstat != 0xC0) { // EEPROMの初期値は0xFFのよう。0x80はエンジンOFF時（保存されない値のはずだが念の為）
+  // 値は00(ON)か40(OFF)しか保存されないはずだが、念の為それ以外だったら0にする（保存途中に電源が切れたりして内容が破壊されることもあり得る)）
+  if(romstat != 0x40 && romstat != 0) {
     romstat = 0;
   }
+  romstat &= 0x40; // 上から2bit目取り出し
   #ifdef DEBUG
   Serial.print(" -> ");
   Serial.println(romstat, HEX); 
@@ -73,7 +74,7 @@ void PktSend() {
   sendbuf[3] = buf[3];
   sendbuf[4] = buf[4];
   sendbuf[5] = buf[5];
-  sendbuf[6] = 0xC0 | (buf[6] & 0x0F); // SW ON
+   sendbuf[6] = 0x40 | buf[6]; // SW ON
   sendbuf[7] = buf[7];
   for(int i = 1; i < len; i++) { // buf[1] から buf[7] を合計してチェックサムを計算
     chksum += sendbuf[i];
@@ -137,7 +138,7 @@ void loop() {
     CAN.readMsgBuf(&id, &len, buf); 
     switch (id) {
       case 0x174: // アイストCU
-        if(buf[2] != 0x08) {
+        if((buf[2] & 0x08) == 0) {
           // エンジンがOFFだったら強制的にステータス0へ遷移(ACCから電源をとる前提。エンジンOFFでパケットが来なくなるようなので、処理的には不要)
           if(STAT) {  // STATが0でない時STATを0にする
             getRomstat(); // EEPROM読み込み
@@ -159,7 +160,7 @@ void loop() {
         }
         switch (STAT) { // ステータスによって違う処理を実行
           case 1: // 保存された設定の適用
-            if(romstat != (buf[4] & 0xF0)) { // 保存された設定状態と現在の設定状態が異なっていたら、SW ONのパケットを送信する
+            if(romstat != (buf[4] & 0x40)) { // 保存された設定状態と現在の設定状態が異なっていたら、SW ONのパケットを送信する
               if(!pktSending) {
                 pktSending = 1;  // 送信中フラグON
                 #ifdef DEBUG
@@ -183,15 +184,15 @@ void loop() {
             } else {
               STAT = 2; // 保存された設定と同じだった or Sendの結果同じになったら、次のステータスへ（2=設定値の保存ステータス）
               pktSending = 0;  // 送信中フラグOFF
-              D4_174 = buf[4] & 0xF0; // 前回受信データの保存
+              D4_174 = buf[4] & 0x40; // 前回受信データの保存
               #ifdef DEBUG
               Serial.println("Mode:2"); 
               #endif
             }
             break;
           case 2: // 設定に変更があったら保存する
-            if((buf[4] & 0xF0) != D4_174) {  // 保存しておいた前回データと違う場合
-              D4_174 = buf[4] & 0xF0; // 前回データの保存
+            if((buf[4] & 0x40) != D4_174) {  // 保存しておいた前回データと違う場合
+              D4_174 = buf[4] & 0x40; // 前回データの保存
               EEPROM.write(ROMADDR, D4_174); // EEPROMへ保存
               #ifdef DEBUG
               Serial.print("Write EEPROM: ");
@@ -206,7 +207,7 @@ void loop() {
       case 0x390: // アイストSW
         // パケット送信
         if(pktSending) { // パケット送信中フラグがONの時
-          if((buf[6] & 0xF0) != 0xC0) { // 自分が送ったデータ含む SW ONのデータを受信した時は、パケットは送らない
+          if((buf[6] & 0x40) != 0x40) { // 自分が送ったデータ含む SW ONのデータを受信した時は、パケットは送らない
             PktSend(); // パケット送信
             refTimes++; // 送信回数カウント
           }
