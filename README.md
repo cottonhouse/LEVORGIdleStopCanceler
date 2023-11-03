@@ -1,18 +1,18 @@
 # LEVORGIdleStopCanceler
 　Idling Stop Setting Value Reserver (Idle Stop Canceler)  
-　for SUBARU LEVORG NV5(2020-)
+　for SUBARU LEVORG VN5(2020-)
 
 # Name
-　SUBARU LEVORG NV5 Idling Stop Setting Value Reserver (Idle Stop Canceler)  
+　SUBARU LEVORG VN5 Idling Stop Setting Value Reserver (Idle Stop Canceler)  
 
 　LEVORGのアイドリングストップ設定を保存し、次回のエンジン起動時に復元する実験をしました。  
  
 # DEMO
 　[動作させたところです。](https://youtube.com/shorts/Mov6Zhl9ecg)  
-　エンジンを起動し直すと設定を反映します。  
+　エンジンを起動し直すとシステムに保存した設定を反映します。  
 　
 # Features
-　スバルのLEVORG(NV5 2020-)は、エンジン起動時に必ずアイドリングストップがONになってしまいます。  
+　スバルのLEVORG(VN5 2020-)は、エンジン起動時に必ずアイドリングストップがONになってしまいます。  
 　アイドリングストップが不要なユーザーにとっては、エンジンを掛ける度にOFFにしなければならず、いささか面倒です。  
 　この実験により、ON/OFFの状態を保存しておき、エンジン始動時に設定を復元させることができました。  
 
@@ -29,10 +29,10 @@
 
 # Installation
 ハードウェア  
-　ArduinoとCANコントローラ(MCP2515)はSPI接続で、Arduinoの2pinをCSにしています。SPIの他の3本は規定のピンです。  
-　（Beetleで動作させたかった関係で、Beetleで外に出ているピンの中から選択しました。）  
+　ArduinoとCANコントローラ(MCP2515)はSPI接続で、Arduinoの2pinをCSにしています。SPIの他の3本は規定のSPIピンです。  
+　（Beetleで動作させたかった関係で、Beetleで外に出ているピンの中からCSを選択しました。）  
 　Ticker(Timer1)を使っている関係で、10pinと9pinは使えません。（Arduino Leonardの仕様）  
-　10pin 9pinを使わなければ、空いているピンをCSに使っても動作すると思います。（プログラムの編集が必要です）  
+　10pin 9pinを使わなければ、他の空いているピンをCSに使っても動作すると思います。（プログラムの編集が必要です）  
 　CANモジュールの水晶発振器の発振周波数は16MHzとしてプログラムを記載しています。  
 　今回使用したCANモジュールは、過去には16MHzの発信機が搭載されていましたが、2023年の現状、8MHzが搭載されているものが大半のようですので、8MHzのモジュールを利用する場合はプログラムの MCP_16MHZ の部分を MCP_8MHZ に書き換えてください。  
 　発振周波数はCANモジュール上に搭載されている水晶発振器の表面に記載されていますので、ご確認ください。  
